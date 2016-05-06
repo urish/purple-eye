@@ -10,6 +10,8 @@ purple-eye
 
 Enable Web Bluetooth under chrome flags (chrome://flags)
 
+[Online Demo](https://urish.github.io/purple-eye/)
+
 ## Hardware
 
 This is the hardware I used for building the robot:

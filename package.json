@@ -1,0 +1,28 @@
+{
+  "name": "purple-eye",
+  "version": "1.0.0",
+  "description": "A web-bluetooth controlled one-eyed robot",
+  "main": "web/blue-eye.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy": "gh-pages -d web"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/urish/purple-eye.git"
+  },
+  "keywords": [
+    "ble",
+    "bluetooth",
+    "web bluetooth"
+  ],
+  "author": "Uri Shaked",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/urish/purple-eye/issues"
+  },
+  "homepage": "https://github.com/urish/purple-eye#readme",
+  "devDependencies": {
+    "gh-pages": "0.11.0"
+  }
+}
