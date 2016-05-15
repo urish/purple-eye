@@ -82,7 +82,7 @@ void setup(void)
   /* Change the device name to make it easier to find */
   Serial.println("Setting device name");
 
-  if (! ble.sendCommandCheckOK(F("AT+GAPDEVNAME=BlueEye")) ) {
+  if (! ble.sendCommandCheckOK(F("AT+GAPDEVNAME=PurpleEye")) ) {
     error(F("Could not set device name?"));
   }
 
