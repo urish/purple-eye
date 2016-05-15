@@ -22,10 +22,15 @@
 #define BLUEFRUIT_SPI_IRQ              7
 #define BLUEFRUIT_SPI_RST              4
 
+#define RIGHT_LEG_PIN 5
+#define RIGHT_FOOT_PIN 11
+#define LEFT_FOOT_PIN 9
+#define LEFT_LEG_PIN 10
+
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 Servo rightFoot, rightLeg, leftFoot, leftLeg;
-int rightFootValue = 90, rightLegValue = 90, leftFootValue = 90, leftLegValue = 90;
+int rightFootValue = 0, rightLegValue = 0, leftFootValue = 0, leftLegValue = 0;
 
 void error(const __FlashStringHelper*err) {
   Serial.println(err);
@@ -33,10 +38,23 @@ void error(const __FlashStringHelper*err) {
 }
 
 void updateServos() {
-  rightFoot.write(rightFootValue + 15);
-  rightLeg.write(rightLegValue);
-  leftFoot.write(leftFootValue - 10);
-  leftLeg.write(leftLegValue);
+  if (leftFootValue == 0 && leftLegValue == 0 && rightFootValue == 0 && rightFootValue == 0) {
+      rightLeg.detach();
+      rightFoot.detach();
+      leftFoot.detach();
+      leftLeg.detach();
+  } else {
+    if (!leftFoot.attached()) {
+      rightLeg.attach(RIGHT_LEG_PIN);
+      rightFoot.attach(RIGHT_FOOT_PIN);
+      leftFoot.attach(LEFT_FOOT_PIN);
+      leftLeg.attach(LEFT_LEG_PIN);
+    }  
+    rightFoot.write(rightFootValue + 15);
+    rightLeg.write(rightLegValue);
+    leftFoot.write(leftFootValue - 10);
+    leftLeg.write(leftLegValue);
+  }
 }
 
 int32_t eyebotServiceId;
@@ -46,10 +64,6 @@ void setup(void)
 {
   boolean success;
 
-  rightLeg.attach(5);
-  rightFoot.attach(11);
-  leftFoot.attach(9);
-  leftLeg.attach(10);
   updateServos();
 
   Serial.begin(115200);
@@ -86,7 +100,7 @@ void setup(void)
     error(F("Could not set device name?"));
   }
 
-  /* Add the Heart Rate Service definition */
+  /* Add the Serve Service definition */
   /* Service ID should be 1 */
   Serial.println(F("Adding the service definition (UUID = 0x5100): "));
   success = ble.sendCommandWithIntReply( F("AT+GATTADDSERVICE=UUID=0x5100"), &eyebotServiceId);
@@ -94,15 +108,15 @@ void setup(void)
     error(F("Could not add service"));
   }
 
-  /* Chars ID for Measurement should be 1 */
+  /* Chars ID for Servo position should be 1 */
   Serial.println(F("Adding the characteristic (UUID = 0x5200): "));
-  success = ble.sendCommandWithIntReply( F("AT+GATTADDCHAR=UUID=0x5200, PROPERTIES=0x0A, MIN_LEN=4, MAX_LEN=4, VALUE=5A-5A-5A-5A"), &eyebotServosCharId);
+  success = ble.sendCommandWithIntReply( F("AT+GATTADDCHAR=UUID=0x5200, PROPERTIES=0x0A, MIN_LEN=4, MAX_LEN=4, VALUE=00-00-00-00"), &eyebotServosCharId);
   if (! success) {
     error(F("Could not add HRM characteristic"));
   }
 
-  /* Add the Heart Rate Service to the advertising data (needed for Nordic apps to detect the service) */
-  //  Serial.print(F("Adding Heart Rate Service UUID to the advertising payload: "));
+  /* Add the Servo Service to the advertising data (needed for Nordic apps to detect the service) */
+  Serial.print(F("Adding Servo Service UUID to the advertising payload: "));
   ble.sendCommandCheckOK( F("AT+GAPSETADVDATA=02-01-06-05-02-00-51-0a-18") );
 
   /* Reset the device for the new service setting changes to take effect */
@@ -112,7 +126,6 @@ void setup(void)
   Serial.println();
 }
 
-/** Send randomized heart rate data continuously **/
 void loop(void)
 {
   /* Command is sent when \n (\r) or println is called */

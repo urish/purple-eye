@@ -49,6 +49,12 @@ function stand() {
         .then(() => console.log('Stand successful'));
 }
 
+function rest() {
+    stopMoving();
+    return writeServos(0, 0, 0, 0)
+        .then(() => console.log('Rest successful'));
+}
+
 let dancing = false,
     shimming = false;
 
