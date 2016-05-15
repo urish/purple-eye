@@ -54,6 +54,7 @@ let dancing = false,
 
 function shimmy() {
     var standing = true;
+    stopMoving();
     shimming = true;
 
     function step() {
@@ -71,6 +72,7 @@ function shimmy() {
 
 function dance() {
     let delta = 0, direction = 1;
+    stopMoving();
     dancing = true;
 
     function danceStep() {
@@ -89,7 +91,7 @@ function dance() {
     danceStep();
 }
 
-function stopDancing() {
+function stopMoving() {
     dancing = false;
     shimming = false;
 }
