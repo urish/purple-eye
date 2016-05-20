@@ -27,6 +27,40 @@
 #define LEFT_FOOT_PIN 9
 #define LEFT_LEG_PIN 10
 
+const uint8_t BLE_ADVERTISE_PACKET[] = {
+  // Advertise The Servo Service
+  0x02,
+  0x01,
+  0x06,
+  0x05,
+  0x02,
+  0x00, 0x51, // Service ID
+  0x0a,
+  0x18,
+
+  // Eddystone URL Beacon. See https://www.mkompf.com/tech/eddystoneurl.html
+  0x03,  // Length of Service List
+  0x03,  // Param: Service List
+  0xAA, 0xFE,  // Eddystone ID
+  0x11,  // Length of Service Data
+  0x16,  // Service Data
+  0xAA, 0xFE, // Eddystone ID
+  0x10,  // Frame type: URL
+  0xF8, // Power
+  0x02, // http://
+  'b',
+  'i',
+  't',
+  '.',
+  'd',
+  'o',
+  '/',
+  'p',
+  'r',
+  'p',
+  'l',
+};
+
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
 Servo rightFoot, rightLeg, leftFoot, leftLeg;
@@ -39,17 +73,17 @@ void error(const __FlashStringHelper*err) {
 
 void updateServos() {
   if (leftFootValue == 0 && leftLegValue == 0 && rightFootValue == 0 && rightFootValue == 0) {
-      rightLeg.detach();
-      rightFoot.detach();
-      leftFoot.detach();
-      leftLeg.detach();
+    rightLeg.detach();
+    rightFoot.detach();
+    leftFoot.detach();
+    leftLeg.detach();
   } else {
     if (!leftFoot.attached()) {
       rightLeg.attach(RIGHT_LEG_PIN);
       rightFoot.attach(RIGHT_FOOT_PIN);
       leftFoot.attach(LEFT_FOOT_PIN);
       leftLeg.attach(LEFT_LEG_PIN);
-    }  
+    }
     rightFoot.write(rightFootValue + 15);
     rightLeg.write(rightLegValue);
     leftFoot.write(leftFootValue - 10);
@@ -115,9 +149,18 @@ void setup(void)
     error(F("Could not add HRM characteristic"));
   }
 
-  /* Add the Servo Service to the advertising data (needed for Nordic apps to detect the service) */
-  Serial.print(F("Adding Servo Service UUID to the advertising payload: "));
-  ble.sendCommandCheckOK( F("AT+GAPSETADVDATA=02-01-06-05-02-00-51-0a-18") );
+  /* Add the Servo Service and Eddystone Beacon to the advertising data */
+  Serial.println(F("Adding Servo Service UUID to the advertising payload: "));
+
+  // Encode advertise packet as hex string
+  char bleAdvStr[sizeof(BLE_ADVERTISE_PACKET) * 3];
+  for (int i = 0; i < sizeof(BLE_ADVERTISE_PACKET); i++) {
+    sprintf(&bleAdvStr[i * 3], "%02x-", BLE_ADVERTISE_PACKET[i]);
+  };
+  bleAdvStr[sizeof(bleAdvStr) - 1] = 0;
+  char cmdBuf[256];
+  snprintf(cmdBuf, sizeof(cmdBuf), "AT+GAPSETADVDATA=%s", bleAdvStr);
+  ble.sendCommandCheckOK( cmdBuf );
 
   /* Reset the device for the new service setting changes to take effect */
   Serial.print(F("Performing a SW reset (service changes require a reset): "));
