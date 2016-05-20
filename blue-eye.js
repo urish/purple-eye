@@ -9,7 +9,7 @@ function connect() {
         .then(device => {
             console.log('> Found ' + device.name);
             console.log('Connecting to GATT Server...');
-            return device.connectGATT();
+            return device.gatt.connect();
         })
         .then(server => {
             console.log('Getting Service 0x5100 - Robot Control...');
