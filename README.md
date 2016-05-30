@@ -3,6 +3,8 @@ purple-eye
 
 > A web-bluetooth controlled one-eyed robot
 
+![Purple Eye](https://farm8.staticflickr.com/7175/27083695372_878bf58031_k.jpg)
+
 ## Prerequisites
 
 * Google Chrome
