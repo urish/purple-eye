@@ -84,7 +84,7 @@ void updateServos() {
       leftFoot.attach(LEFT_FOOT_PIN);
       leftLeg.attach(LEFT_LEG_PIN);
     }
-    rightFoot.write(rightFootValue + 15);
+    rightFoot.write(rightFootValue + 8);
     rightLeg.write(rightLegValue);
     leftFoot.write(leftFootValue - 10);
     leftLeg.write(leftLegValue);
@@ -93,6 +93,8 @@ void updateServos() {
 
 int32_t eyebotServiceId;
 int32_t eyebotServosCharId;
+int32_t batteryServiceId;
+int32_t batteryLevelCharId;
 
 void setup(void)
 {
@@ -134,19 +136,34 @@ void setup(void)
     error(F("Could not set device name?"));
   }
 
-  /* Add the Serve Service definition */
+  /* Add the Servo Service definition */
   /* Service ID should be 1 */
-  Serial.println(F("Adding the service definition (UUID = 0x5100): "));
+  Serial.println(F("Adding the Servo service definition (UUID = 0x5100): "));
   success = ble.sendCommandWithIntReply( F("AT+GATTADDSERVICE=UUID=0x5100"), &eyebotServiceId);
   if (! success) {
-    error(F("Could not add service"));
+    error(F("Could not add Servo service"));
   }
 
   /* Chars ID for Servo position should be 1 */
-  Serial.println(F("Adding the characteristic (UUID = 0x5200): "));
+  Serial.println(F("Adding the Servo Position characteristic (UUID = 0x5200): "));
   success = ble.sendCommandWithIntReply( F("AT+GATTADDCHAR=UUID=0x5200, PROPERTIES=0x0A, MIN_LEN=4, MAX_LEN=4, VALUE=00-00-00-00"), &eyebotServosCharId);
   if (! success) {
-    error(F("Could not add HRM characteristic"));
+    error(F("Could not add Servo characteristic"));
+  }
+
+  /* Add the Battery Service definition */
+  /* Service ID should be 1 */
+  Serial.println(F("Adding the service definition (UUID = 0x180F): "));
+  success = ble.sendCommandWithIntReply( F("AT+GATTADDSERVICE=UUID=0x180F"), &batteryServiceId);
+  if (! success) {
+    error(F("Could not add Battery service"));
+  }
+
+  /* Chars ID for Battery Level should be 1 */
+  Serial.println(F("Adding the characteristic (UUID = 0x2A19): "));
+  success = ble.sendCommandWithIntReply( F("AT+GATTADDCHAR=UUID=0x2A19, PROPERTIES=0x12, MIN_LEN=1, MAX_LEN=1, VALUE=00"), &batteryLevelCharId);
+  if (! success) {
+    error(F("Could not add Battery Level characteristic"));
   }
 
   /* Add the Servo Service and Eddystone Beacon to the advertising data */
@@ -169,14 +186,28 @@ void setup(void)
   Serial.println();
 }
 
+uint8_t lastBatteryLevel = 0;
 void loop(void)
 {
-  /* Command is sent when \n (\r) or println is called */
-  /* AT+GATTCHAR=CharacteristicID,value */
+  float voltage = analogRead(A0) * 3.3 / 512;
+  uint8_t batteryLevel = max(0, min(100, (voltage - 3.6) / 0.6 * 100));
+
+  // Update Battery Level Charasteristic if necessary
+  if (lastBatteryLevel != batteryLevel) {
+    ble.print("AT+GATTCHAR=");
+    ble.print(batteryLevelCharId);
+    ble.print(",");
+    ble.println(batteryLevel);
+    ble.waitForOK();
+    lastBatteryLevel = batteryLevel;
+  };
+
+  // Read servo values
   ble.print("AT+GATTCHAR=");
   ble.println(eyebotServosCharId);
 
-  /* Check if command executed OK */
+  Serial.println(batteryLevel);
+
   char buf[100] = {0};
   ble.readline(buf, sizeof(buf));
   sscanf(buf, "%02x-%02x-%02x-%02x", &rightLegValue, &rightFootValue, &leftFootValue, &leftLegValue);
