@@ -1,17 +1,36 @@
 'use strict';
 
+let gattServer = null;
 let servoCharasteristic = null;
+let batteryCharasteristic = null;
+
+function indicateBatteryLevel(value) {
+    document.querySelector('.battery-level-text').textContent = value + '%';
+    const batteryLevelIcon = document.querySelector('.battery-level > .fa');
+    if (value > 85) {
+        batteryLevelIcon.className = 'fa fa-battery-full';
+    } else if (value > 65) {
+        batteryLevelIcon.className = 'fa fa-battery-three-quarters';
+    } else if (value > 40) {
+        batteryLevelIcon.className = 'fa fa-battery-half';
+    } else if (value > 20) {
+        batteryLevelIcon.className = 'fa fa-battery-quarter';
+    } else {
+        batteryLevelIcon.className = 'fa fa-battery-empty';
+    }
+}
 
 function connect() {
     console.log('Requesting Bluetooth Device...');
     navigator.bluetooth.requestDevice(
-        { filters: [{ services: [0x5100] }] })
+        { filters: [{ services: [0x5100] }], optionalServices: ['battery_service'] })
         .then(device => {
             console.log('> Found ' + device.name);
             console.log('Connecting to GATT Server...');
             return device.gatt.connect();
         })
         .then(server => {
+            gattServer = server;
             console.log('Getting Service 0x5100 - Robot Control...');
             return server.getPrimaryService(0x5100);
         })
@@ -22,6 +41,25 @@ function connect() {
         .then(characteristic => {
             console.log('All ready!');
             servoCharasteristic = characteristic;
+        })
+        .then(() => {
+            return gattServer.getPrimaryService('battery_service')
+        })
+        .then(service => {
+            return service.getCharacteristic('battery_level');
+        })
+        .then(characteristic => {
+            batteryCharasteristic = characteristic;
+            return batteryCharasteristic.readValue();
+        }).then(value => {
+            indicateBatteryLevel(value.getUint8(0));
+            return batteryCharasteristic.startNotifications();
+        }).then(_ => {
+            batteryCharasteristic.addEventListener('characteristicvaluechanged', e => {
+                const batteryLevel = e.target.value.getUint8(0);
+                indicateBatteryLevel(batteryLevel);
+            });
+            console.log('> Notifications started');
         })
         .catch(error => {
             console.log('Argh! ' + error);
