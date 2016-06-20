@@ -1,8 +1,8 @@
 'use strict';
 
 let gattServer = null;
-let servoCharasteristic = null;
-let batteryCharasteristic = null;
+let servoCharacteristic = null;
+let batteryCharacteristic = null;
 
 function indicateBatteryLevel(value) {
     document.querySelector('.battery-level-text').textContent = value + '%';
@@ -40,7 +40,7 @@ function connect() {
         })
         .then(characteristic => {
             console.log('All ready!');
-            servoCharasteristic = characteristic;
+            servoCharacteristic = characteristic;
         })
         .then(() => {
             return gattServer.getPrimaryService('battery_service')
@@ -49,13 +49,13 @@ function connect() {
             return service.getCharacteristic('battery_level');
         })
         .then(characteristic => {
-            batteryCharasteristic = characteristic;
-            return batteryCharasteristic.readValue();
+            batteryCharacteristic = characteristic;
+            return batteryCharacteristic.readValue();
         }).then(value => {
             indicateBatteryLevel(value.getUint8(0));
-            return batteryCharasteristic.startNotifications();
+            return batteryCharacteristic.startNotifications();
         }).then(_ => {
-            batteryCharasteristic.addEventListener('characteristicvaluechanged', e => {
+            batteryCharacteristic.addEventListener('characteristicvaluechanged', e => {
                 const batteryLevel = e.target.value.getUint8(0);
                 indicateBatteryLevel(batteryLevel);
             });
@@ -73,7 +73,7 @@ function writeServos(rightLegValue, rightFootValue, leftFootValue, leftLegValue)
     view[1] = rightFootValue;
     view[2] = leftFootValue;
     view[3] = leftLegValue;
-    return servoCharasteristic.writeValue(buffer)
+    return servoCharacteristic.writeValue(buffer)
         .catch(err => console.log('Error when writing value! ', err));
 }
 
