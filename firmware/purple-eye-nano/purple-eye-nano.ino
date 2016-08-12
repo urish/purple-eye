@@ -8,6 +8,10 @@
 #include <Servo.h>
 
 #define DEVICE_NAME       "PurpleEye"
+#define RIGHT_LEG_PIN     D4
+#define RIGHT_FOOT_PIN    D5
+#define LEFT_FOOT_PIN     D6
+#define LEFT_LEG_PIN      D7
 #define BATTERY_LEVEL_PIN A5
 
 // Physical Web
@@ -24,7 +28,7 @@ BLE    ble;
 static const uint16_t advertisedServices[] = { GattService::UUID_BATTERY_SERVICE, 0x5100, EDDYSTONE_SERVICE_UUID };
 
 // Servos
-Servo              servos[4];
+Servo              leftFoot, rightFoot, leftLeg, rightLeg;
 static uint8_t     servoValues[4]         = {0, 0, 0, 0};
 GattCharacteristic servosChar(0x5200, servoValues, sizeof(servoValues), sizeof(servoValues), GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE_WITHOUT_RESPONSE);
 GattCharacteristic *servosChars[] = {&servosChar, };
@@ -37,6 +41,26 @@ GattCharacteristic batteryLevelChar(GattCharacteristic::UUID_BATTERY_LEVEL_CHAR,
 GattCharacteristic *batteryServiceChars[] = {&batteryLevelChar };
 GattService        batteryService(GattService::UUID_BATTERY_SERVICE, batteryServiceChars, sizeof(batteryServiceChars) / sizeof(GattCharacteristic *));
 
+void updateServos() {
+  if (servoValues[0] == 0 && servoValues[1] == 0 && servoValues[2] == 0 && servoValues[3] == 0) {
+    rightLeg.detach();
+    rightFoot.detach();
+    leftFoot.detach();
+    leftLeg.detach();
+  } else {
+    if (!leftFoot.attached()) {
+      rightLeg.attach(RIGHT_LEG_PIN);
+      rightFoot.attach(RIGHT_FOOT_PIN);
+      leftFoot.attach(LEFT_FOOT_PIN);
+      leftLeg.attach(LEFT_LEG_PIN);
+    }
+    rightLeg.write(servoValues[0]);
+    rightFoot.write(servoValues[1] + 8);
+    leftFoot.write(servoValues[2] - 10);
+    leftLeg.write(servoValues[3]);
+  }
+}
+
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
   ble.startAdvertising();
   Serial.println("Disconnected :-(");
@@ -44,23 +68,16 @@ void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
 
 void gattServerWriteCallBack(const GattWriteCallbackParams *params) {
   if (params->handle == servosChar.getValueAttribute().getHandle()) {
-    Serial.print("Updating servos: ");
+    Serial.print("Updating servos...");
     memcpy(servoValues, params->data, params->len);
-    for (uint16_t i = 0; i < params->len; i++) {
-      servos[i].write(servoValues[i]);
-      if (i > 0) {
-        Serial.print(", ");
-      }
-      Serial.print(servoValues[i], HEX);
-    }
-    Serial.println("");
+    updateServos();
   }
 }
 
 void updateBatteryLevelCallback() {
   if (ble.getGapState().connected) {
-    // TODO: convert voltage level to value in range [0..100]
-    batteryLevel[0] = analogRead(BATTERY_LEVEL_PIN);
+    float voltage = analogRead(BATTERY_LEVEL_PIN) * 3.3 / 512;
+    batteryLevel[0] = max(0, min(100, (int)((voltage - 3.6) / 0.6 * 100)));
     ble.updateCharacteristicValue(batteryLevelChar.getValueAttribute().getHandle(), batteryLevel, sizeof(batteryLevel));
   }
 }
@@ -69,11 +86,12 @@ void setup() {
   Serial.begin(9600);
   Serial.println("Purple Eye Nano!");
 
-  pinMode(A5, INPUT);
-  servos[0].attach(D4);
-  servos[1].attach(D5);
-  servos[2].attach(D6);
-  servos[3].attach(D7);
+  // LED consumes about 0.3ma, so we turn it off.
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, 1);
+
+  pinMode(BATTERY_LEVEL_PIN, INPUT);
+  updateServos();
 
   ble.init();
   ble.onDisconnection(disconnectionCallBack);
@@ -97,7 +115,7 @@ void setup() {
   // Battery level task
   batteryTask.attach(updateBatteryLevelCallback, 1);
 
-  Serial.println("Ready :)");
+  Serial.println("Ready :-)");
 }
 
 void loop() {
