@@ -5,7 +5,7 @@
 */
 
 #include <BLE_API.h>
-#include <Servo.h>
+#include "nrf51servo.h"
 
 #define DEVICE_NAME       "PurpleEye"
 #define RIGHT_LEG_PIN     D4
