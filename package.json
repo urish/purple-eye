@@ -2,7 +2,7 @@
   "name": "purple-eye",
   "version": "1.0.0",
   "description": "A web-bluetooth controlled one-eyed robot",
-  "main": "web/blue-eye.js",
+  "main": "web/purple-eye.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "deploy": "gh-pages -d web"

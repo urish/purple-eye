@@ -106,7 +106,7 @@ function shimmy() {
         standing = !standing;
         promise.then(() => {
             if (shimming) {
-                setTimeout(step, 0);
+                setTimeout(step, 150);
             }
         })
     }
@@ -120,14 +120,14 @@ function dance() {
     dancing = true;
 
     function danceStep() {
-        delta += direction * 5;
-        if (delta > 25 || delta < -25) {
+        delta += direction * 2;
+        if (delta > 20 || delta < -20) {
             direction = -direction;
         }
         writeServos(90 + delta, 90 + delta, 90 + delta, 90 + delta)
             .then(() => {
                 if (dancing) {
-                    setTimeout(danceStep(), 0);
+                    setTimeout(danceStep, 10);
                 }
             });
     }
