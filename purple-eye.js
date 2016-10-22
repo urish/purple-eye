@@ -127,7 +127,7 @@ function dance() {
         writeServos(90 + delta, 90 + delta, 90 + delta, 90 + delta)
             .then(() => {
                 if (dancing) {
-                    setTimeout(danceStep(), 150);
+                    setTimeout(danceStep, 10);
                 }
             });
     }
