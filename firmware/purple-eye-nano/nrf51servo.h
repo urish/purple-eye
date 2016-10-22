@@ -19,7 +19,7 @@
 #define MIN_PULSE_WIDTH        544     
 #define MAX_PULSE_WIDTH        2400
 
-#define SERVO_REFRESH_INTERVAL 20000   // Refresh servos every 20ms
+#define SERVO_REFRESH_INTERVAL 10000   // Refresh servos every 10ms
 #define DEFAULT_PULSE_WIDTH    1500     // default pulse width when servo is attached
 
 class Servo {

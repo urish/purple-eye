@@ -16,6 +16,7 @@
 
 static mbed::Ticker servo_task;
 static uint8_t   servo_count = 0;
+static uint8_t   servo_index = 0;
 static Servo *servos[MAX_SERVOS] = {0};
 
 static nrf_radio_signal_callback_return_param_t signal_callback_return_param = {0};
@@ -31,32 +32,14 @@ static nrf_radio_signal_callback_return_param_t * radio_callback(uint8_t signal_
       signal_callback_return_param.params.request.p_next = NULL;
       signal_callback_return_param.callback_action = NRF_RADIO_SIGNAL_CALLBACK_ACTION_END;
 
-      servo_tick_counter = servos[0]->readMicroseconds();
-      for (uint8_t i = 0; i < servo_count; i++) {
-        uint16_t ms = servos[i]->readMicroseconds();
-        if (ms < servo_tick_counter) {
-          servo_tick_counter = ms;
-        }
-        digitalWrite(servos[i]->getPin(), 1);
+      servo_index++;
+      if (servo_index >= servo_count) {
+        servo_index = 0;
       }
 
-      delayMicroseconds(servo_tick_counter);
-
-      do {
-        next_tick = 0;
-        for (uint8_t i = 0; i < servo_count; i++) {
-          uint16_t ms = servos[i]->readMicroseconds();
-          if (ms <= servo_tick_counter) {
-            digitalWrite(servos[i]->getPin(), 0);
-          } else if ((next_tick == 0) || (ms < next_tick)) {
-            next_tick = ms;
-          }
-        }
-        if (next_tick > 0) {
-            delayMicroseconds(next_tick - servo_tick_counter);
-            servo_tick_counter = next_tick;
-        }
-      } while (next_tick > 0);
+      digitalWrite(servos[servo_index]->getPin(), HIGH);
+      delayMicroseconds(servos[servo_index]->readMicroseconds());
+      digitalWrite(servos[servo_index]->getPin(), LOW);
       break;
 
     case NRF_RADIO_CALLBACK_SIGNAL_TYPE_RADIO:
