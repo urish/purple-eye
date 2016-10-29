@@ -7,10 +7,12 @@ purple-eye
 
 ## Prerequisites
 
-* Google Chrome
-* A phone/tablet running Android 6.0 or newer
+You need Google Chrome 53 or newer, and on of the following:
 
-Enable Web Bluetooth under chrome flags (chrome://flags)
+* Android 6.0 or newer
+* Mac OS X 10.10 or newer
+* Chrome Book running OS 
+* Recent Linux ([see here for details](https://acassis.wordpress.com/2016/06/28/how-to-get-chrome-web-bluetooth-working-on-linux/))
 
 [Online Demo](https://urish.github.io/purple-eye/)
 
