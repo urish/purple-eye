@@ -68,7 +68,6 @@ void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
 
 void gattServerWriteCallBack(const GattWriteCallbackParams *params) {
   if (params->handle == servosChar.getValueAttribute().getHandle()) {
-    Serial.print("Updating servos...");
     memcpy(servoValues, params->data, params->len);
     updateServos();
   }
