@@ -5,6 +5,8 @@
 */
 
 #include <BLE_API.h>
+#include <Wire.h>
+#include <LSM303.h>
 #include "nrf51servo.h"
 
 #define DEVICE_NAME       "PurpleEye"
@@ -41,6 +43,14 @@ GattCharacteristic batteryLevelChar(GattCharacteristic::UUID_BATTERY_LEVEL_CHAR,
 GattCharacteristic *batteryServiceChars[] = {&batteryLevelChar };
 GattService        batteryService(GattService::UUID_BATTERY_SERVICE, batteryServiceChars, sizeof(batteryServiceChars) / sizeof(GattCharacteristic *));
 
+// Accelerometer + Magnetometer (IMU)
+LSM303             imuDevice;
+bool               imuAvailable;
+static uint16_t    imuData[6] = {0, 0, 0, 0, 0, 0};
+GattCharacteristic imuChar(0xff09, (uint8_t*)imuData, sizeof(imuData), sizeof(imuData), GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+GattCharacteristic *imuChars[] = {&imuChar };
+GattService        imuService(0xff08, imuChars, sizeof(imuChars) / sizeof(GattCharacteristic *));
+
 void updateServos() {
   if (servoValues[0] == 0 && servoValues[1] == 0 && servoValues[2] == 0 && servoValues[3] == 0) {
     rightLeg.detach();
@@ -73,11 +83,28 @@ void gattServerWriteCallBack(const GattWriteCallbackParams *params) {
   }
 }
 
-void updateBatteryLevelCallback() {
+void sensorsCallback() {
   if (ble.getGapState().connected) {
+    // Battery Level
     float voltage = analogRead(BATTERY_LEVEL_PIN) * 3.3 / 512;
     batteryLevel[0] = max(0, min(100, (int)((voltage - 3.6) / 0.6 * 100)));
     ble.updateCharacteristicValue(batteryLevelChar.getValueAttribute().getHandle(), batteryLevel, sizeof(batteryLevel));
+
+    // IMU
+    if (imuAvailable) {
+      imuDevice.read();
+      if (imuDevice.timeoutOccurred()) {
+        memset(imuData, 0, sizeof(imuData));
+      } else {
+        imuData[0] = imuDevice.a.x;
+        imuData[1] = imuDevice.a.y;
+        imuData[2] = imuDevice.a.z;
+        imuData[3] = imuDevice.m.x;
+        imuData[4] = imuDevice.m.y;
+        imuData[5] = imuDevice.m.z;
+      }
+      ble.updateCharacteristicValue(imuChar.getValueAttribute().getHandle(), (uint8_t*)imuData, sizeof(imuData));
+    }
   }
 }
 
@@ -85,11 +112,20 @@ void setup() {
   Serial.begin(9600);
   Serial.println("Purple Eye Nano!");
 
+  Wire.begin();
+  imuAvailable = imuDevice.init();
+  imuDevice.setTimeout(1);
+  imuDevice.enableDefault();
+
   // LED consumes about 0.3ma, so we turn it off.
   pinMode(LED, OUTPUT);
   digitalWrite(LED, 1);
 
   pinMode(BATTERY_LEVEL_PIN, INPUT);
+  pinMode(RIGHT_LEG_PIN, OUTPUT);
+  pinMode(RIGHT_FOOT_PIN, OUTPUT);
+  pinMode(LEFT_FOOT_PIN, OUTPUT);
+  pinMode(LEFT_LEG_PIN, OUTPUT);
   updateServos();
 
   ble.init();
@@ -105,6 +141,7 @@ void setup() {
 
   ble.addService(servosService);
   ble.addService(batteryService);
+  ble.addService(imuService);
   ble.setDeviceName((const uint8_t *)DEVICE_NAME);
   ble.setTxPower(4);
   ble.setAdvertisingInterval(160); // (100 ms = 160 * 0.625ms.)
@@ -112,7 +149,7 @@ void setup() {
   ble.startAdvertising();
 
   // Battery level task
-  batteryTask.attach(updateBatteryLevelCallback, 1);
+  batteryTask.attach(sensorsCallback, 0.1);
 
   Serial.println("Ready :-)");
 }
