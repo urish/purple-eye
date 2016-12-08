@@ -4,6 +4,49 @@ let gattServer = null;
 let servoCharacteristic = null;
 let batteryCharacteristic = null;
 
+var robotModel, arrow;
+
+(function () {
+    var scene = new THREE.Scene();
+
+    var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 20000);
+    camera.position.set(60, 50, 0);
+    camera.lookAt(scene.position);
+    scene.add(camera);
+
+    var light = new THREE.AmbientLight(0xffffff);
+    light.position.set(50, 50, 0);
+    scene.add(light);
+
+    var loader = new THREE.ColladaLoader();
+    loader.options.convertUpAxis = true;
+    loader.load('./purple-eye.dae', function (collada) {
+        robotModel = collada.scene;
+        robotModel.scale.set(10, 10, 10);
+        robotModel.getObjectByName('Eyeball').children[0].geometry.computeVertexNormals();
+        scene.add(robotModel);
+    });
+
+    var plane = new THREE.Mesh(
+        new THREE.PlaneBufferGeometry(100, 100),
+        new THREE.MeshPhongMaterial({ color: 0x404040, specular: 0x101010 })
+    );
+    plane.rotation.x = -Math.PI / 2;
+    plane.receiveShadow = true;
+    scene.add(plane);
+
+    var renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(300, 300);
+    document.body.appendChild(renderer.domElement);
+
+    function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+    }
+
+    animate();
+})();
+
 function indicateBatteryLevel(value) {
     document.querySelector('.battery-level-text').textContent = value + '%';
     const batteryLevelIcon = document.querySelector('.battery-level > .fa');
@@ -23,7 +66,7 @@ function indicateBatteryLevel(value) {
 function connect() {
     console.log('Requesting Bluetooth Device...');
     navigator.bluetooth.requestDevice(
-        { filters: [{ services: [0x5100] }], optionalServices: ['battery_service'] })
+        { filters: [{ services: [0x5100] }], optionalServices: ['battery_service', 0xff08] })
         .then(device => {
             console.log('> Found ' + device.name);
             console.log('Connecting to GATT Server...');
@@ -60,6 +103,30 @@ function connect() {
                 indicateBatteryLevel(batteryLevel);
             });
             console.log('> Notifications started');
+        })
+        .then(() => {
+            return gattServer.getPrimaryService(0xff08);
+        })
+        .then(service => {
+            return service.getCharacteristic(0xff09);
+        })
+        .then(imuCharacteristic => {
+            imuCharacteristic.startNotifications();
+            imuCharacteristic.addEventListener('characteristicvaluechanged', e => {
+                var ax = e.target.value.getInt16(0, true);
+                var az = e.target.value.getInt16(2, true);
+                var ay = -e.target.value.getInt16(4, true);
+                var mx = e.target.value.getInt16(6, true);
+                var my = e.target.value.getInt16(8, true);
+                var mz = e.target.value.getInt16(10, true);
+
+                var gVector = new THREE.Vector3(az, ay, -ax);
+                gVector.applyAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI);
+                var yAxis = new THREE.Vector3(0, 1, 0);
+                robotModel.quaternion.setFromUnitVectors(yAxis, gVector.clone().normalize());
+
+                console.log('imu:', ax.toString(16), ay.toString(16), az.toString(16), mx, my, mz);
+            });
         })
         .catch(error => {
             console.log('Argh! ' + error);
