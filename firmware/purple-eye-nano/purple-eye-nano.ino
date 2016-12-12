@@ -7,6 +7,7 @@
 #include <BLE_API.h>
 #include <Wire.h>
 #include <LSM303.h>
+#include <L3G.h>
 #include "nrf51servo.h"
 
 #define DEVICE_NAME       "PurpleEye"
@@ -43,10 +44,12 @@ GattCharacteristic batteryLevelChar(GattCharacteristic::UUID_BATTERY_LEVEL_CHAR,
 GattCharacteristic *batteryServiceChars[] = {&batteryLevelChar };
 GattService        batteryService(GattService::UUID_BATTERY_SERVICE, batteryServiceChars, sizeof(batteryServiceChars) / sizeof(GattCharacteristic *));
 
-// Accelerometer + Magnetometer (IMU)
+// Accelerometer + Magnetometer + Gyro (IMU)
 LSM303             imuDevice;
 bool               imuAvailable;
-static uint16_t    imuData[6] = {0, 0, 0, 0, 0, 0};
+L3G                gyro;
+bool               gyroAvailable;
+static uint16_t    imuData[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
 GattCharacteristic imuChar(0xff09, (uint8_t*)imuData, sizeof(imuData), sizeof(imuData), GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
 GattCharacteristic *imuChars[] = {&imuChar };
 GattService        imuService(0xff08, imuChars, sizeof(imuChars) / sizeof(GattCharacteristic *));
@@ -93,15 +96,22 @@ void sensorsCallback() {
     // IMU
     if (imuAvailable) {
       imuDevice.read();
-      if (imuDevice.timeoutOccurred()) {
-        memset(imuData, 0, sizeof(imuData));
-      } else {
+      memset(imuData, 0, sizeof(imuData));
+      if (!imuDevice.timeoutOccurred()) {
         imuData[0] = imuDevice.a.x;
         imuData[1] = imuDevice.a.y;
         imuData[2] = imuDevice.a.z;
         imuData[3] = imuDevice.m.x;
         imuData[4] = imuDevice.m.y;
         imuData[5] = imuDevice.m.z;
+      }
+      if (gyroAvailable) {
+        gyro.read();
+        if (!gyro.timeoutOccurred()) {
+          imuData[6] = gyro.g.x;
+          imuData[7] = gyro.g.y;
+          imuData[8] = gyro.g.z;
+        }
       }
       ble.updateCharacteristicValue(imuChar.getValueAttribute().getHandle(), (uint8_t*)imuData, sizeof(imuData));
     }
@@ -116,6 +126,9 @@ void setup() {
   imuAvailable = imuDevice.init();
   imuDevice.setTimeout(1);
   imuDevice.enableDefault();
+  gyroAvailable = gyro.init();
+  gyro.setTimeout(1);
+  gyro.enableDefault();
 
   // LED consumes about 0.3ma, so we turn it off.
   pinMode(LED, OUTPUT);
