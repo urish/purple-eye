@@ -62,6 +62,12 @@ GattCharacteristic imuChar(0xff09, (uint8_t*)imuData, sizeof(imuData), sizeof(im
 GattCharacteristic *imuChars[] = {&imuChar };
 GattService        imuService(0xff08, imuChars, sizeof(imuChars) / sizeof(GattCharacteristic *));
 
+// Sound
+byte               playerData[] = {0, 0, 0};
+GattCharacteristic playerChar(0xff1a, (uint8_t*)playerData, sizeof(playerData), sizeof(playerData), GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE_WITHOUT_RESPONSE);
+GattCharacteristic *playerChars[] = {&playerChar };
+GattService        playerService(0xff10, playerChars, sizeof(playerChars) / sizeof(GattCharacteristic *));
+
 // Storage
 bool               storageAvailable = false;
 FS_SECTION_VARS_ADD(fs_config_t storageConfig) = { .cb = &storageCallback, .num_pages = 1, .page_order = 1 };
@@ -106,6 +112,26 @@ void saveServoOffsets() {
   fs_erase(&storageConfig, storageConfig.p_start_addr, FS_PAGE_SIZE_WORDS);
 }
 
+void playerCommand(byte cmd, byte arg1, byte arg2) {
+  byte data[10] = {0x7e, 0xff, 0x6, cmd, 0, arg1, arg2, 0, 0, 0xef};
+  int16_t checksum = 0 - data[1] - data[2] - data[3] - data[4] - data[5] - data[6];
+  data[7] = (checksum >> 8) & 0xff;
+  data[8] = checksum & 0xff;
+  Serial.write(data, sizeof(data));
+}
+
+void playerCommand(byte cmd, uint16_t arg) {
+  playerCommand(cmd, arg >> 8, arg & 0xff);
+}
+
+void playSound(uint16_t fileNum, byte volume) {
+  if (volume > 0) {
+    playerCommand(0x6, 0, volume);
+    delay(10);
+  }
+  playerCommand(0x3, fileNum);
+}
+
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
   ble.startAdvertising();
   Serial.println("Disconnected :-(");
@@ -119,6 +145,11 @@ void gattServerWriteCallBack(const GattWriteCallbackParams *params) {
   if (params->handle == servoOffsetsChar.getValueAttribute().getHandle()) {
     memcpy(servoOffsets, params->data, params->len);
     saveServoOffsets();
+  }
+  if ((params->handle == playerChar.getValueAttribute().getHandle()) && (params->len >= 2)) {
+    uint16_t fileId = *(uint16_t*)params->data;
+    uint8_t volume = params->len == 3 ? params->data[2] : 0;
+    playSound(fileId, volume);
   }
 }
 
@@ -201,6 +232,7 @@ void setup() {
   ble.addService(servosService);
   ble.addService(batteryService);
   ble.addService(imuService);
+  ble.addService(playerService);
   ble.setDeviceName((const uint8_t *)DEVICE_NAME);
   ble.setTxPower(4);
   ble.setAdvertisingInterval(160); // (100 ms = 160 * 0.625ms.)
@@ -212,8 +244,6 @@ void setup() {
 
   // Override the system event handler - this is required for fstorage
   softdevice_sys_evt_handler_set(sysEventHandler);
-
-  Serial.println("Ready :-)");
 }
 
 void loop() {
