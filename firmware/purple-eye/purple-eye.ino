@@ -28,23 +28,17 @@
 #define LEFT_LEG_PIN 10
 
 const uint8_t BLE_ADVERTISE_PACKET[] = {
-  // Advertise The Servo Service
-  0x02,
-  0x01,
-  0x06,
-  0x05,
-  0x02,
-  0x00, 0x51, // Service ID
-  0x0a,
-  0x18,
-
   // Eddystone URL Beacon. See https://www.mkompf.com/tech/eddystoneurl.html
-  0x03,  // Length of Service List
+  0x07,  // Length of Service List
   0x03,  // Param: Service List
+  0x00, 0x51, // Purple Eye Service ID
+  0x0a, 0x18, // Battery Level Service
   0xAA, 0xFE,  // Eddystone ID
+  
   0x11,  // Length of Service Data
   0x16,  // Service Data
   0xAA, 0xFE, // Eddystone ID
+  
   0x10,  // Frame type: URL
   0xF8, // Power
   0x02, // http://
