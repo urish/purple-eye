@@ -5,8 +5,8 @@
 */
 
 extern "C" {
-#include <pstorage.h>
-#include <fstorage.h>
+#include "pstorage.h"
+#include "fstorage.h"
 #include "softdevice_handler.h"
 }
 
@@ -32,6 +32,10 @@ uint8_t eddystoneData[]  = {
   0x03,        // https://
   'b', 'i', 't', '.', 'd', 'o', '/', 'p', 'r', 'p', 'l',
 };
+
+// ng-beacon scanning parameters
+#define RSSI_THRESHOLD -50
+#define TARGET_DEVICE_NAME "ng-beacon"
 
 BLE    ble;
 static const uint16_t advertisedServices[] = { GattService::UUID_BATTERY_SERVICE, 0x5100, EDDYSTONE_SERVICE_UUID };
@@ -71,6 +75,11 @@ GattService        playerService(0xff10, playerChars, sizeof(playerChars) / size
 // Storage
 bool               storageAvailable = false;
 FS_SECTION_VARS_ADD(fs_config_t storageConfig) = { .cb = &storageCallback, .num_pages = 1, .page_order = 1 };
+
+// Dancer
+Ticker             danceTask;
+int8_t             dancePosition = 0;
+int8_t             danceDirection = 1;
 
 void updateServos() {
   if (servoValues[0] == 0 && servoValues[1] == 0 && servoValues[2] == 0 && servoValues[3] == 0) {
@@ -185,6 +194,63 @@ void sensorsCallback() {
   }
 }
 
+char *getDeviceName(const uint8_t *data, byte dlen) {
+  static char result[16];
+  byte index = 0;
+
+  while (index + 1 < dlen) {
+    byte field_len = data[index];
+    byte field_type = data[index + 1];
+    const void *field_data = &data[index + 2];
+    index += field_len + 1;
+
+    if (field_type == BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME) {
+      field_len--;
+      if (field_len > 15) {
+        field_len = 15;
+      }
+      memcpy(result, field_data, field_len);
+      result[field_len] = 0;
+      return result;
+    }
+  }
+
+  return NULL;
+}
+
+unsigned long beaconLastSeen = millis();
+void danceCallback() {
+  if (millis() - 2000 > beaconLastSeen) {
+    beaconLastSeen = 0;
+    dancePosition = 0;
+    danceTask.detach();
+  }
+
+  servoValues[0] = 90 + dancePosition;
+  servoValues[1] = 90 + dancePosition;
+  servoValues[2] = 90 + dancePosition;
+  servoValues[3] = 90 + dancePosition;
+  updateServos();
+
+  dancePosition += danceDirection * 2;
+  if (dancePosition > 20 || dancePosition < -20) {
+    danceDirection = -danceDirection;
+  }
+}
+
+void scanningCallback(const Gap::AdvertisementCallbackParams_t* params) {
+  char *deviceName = getDeviceName((const uint8_t *)params->advertisingData, params->advertisingDataLen);
+  if ((params->rssi > RSSI_THRESHOLD) && !strcmp(deviceName, TARGET_DEVICE_NAME)) {
+    Serial.print("Found beacon, RSSI=");
+    Serial.println(params->rssi, DEC);
+
+    if (!beaconLastSeen) {
+      danceTask.attach(danceCallback, 0.02);
+    }
+    beaconLastSeen = millis();
+  }
+}
+
 void setup() {
   Serial.begin(9600);
   Serial.println("Purple Eye Nano!");
@@ -238,6 +304,10 @@ void setup() {
   ble.setAdvertisingInterval(160); // (100 ms = 160 * 0.625ms.)
   ble.setAdvertisingTimeout(0);
   ble.startAdvertising();
+
+  // scanning for ng-beacons
+  ble.setScanParams(200, 100, 0, true);
+  ble.startScan(scanningCallback);
 
   // Battery level task
   batteryTask.attach(sensorsCallback, 0.1);
