@@ -5,8 +5,8 @@
 */
 
 extern "C" {
-#include <pstorage.h>
-#include <fstorage.h>
+#include "pstorage.h"
+#include "fstorage.h"
 #include "softdevice_handler.h"
 }
 
@@ -32,6 +32,10 @@ uint8_t eddystoneData[]  = {
   0x03,        // https://
   'b', 'i', 't', '.', 'd', 'o', '/', 'p', 'r', 'p', 'l',
 };
+
+// ng-beacon scanning parameters
+#define RSSI_THRESHOLD -50
+#define TARGET_DEVICE_NAME "ng-beacon"
 
 BLE    ble;
 static const uint16_t advertisedServices[] = { GattService::UUID_BATTERY_SERVICE, 0x5100, EDDYSTONE_SERVICE_UUID };
@@ -62,9 +66,20 @@ GattCharacteristic imuChar(0xff09, (uint8_t*)imuData, sizeof(imuData), sizeof(im
 GattCharacteristic *imuChars[] = {&imuChar };
 GattService        imuService(0xff08, imuChars, sizeof(imuChars) / sizeof(GattCharacteristic *));
 
+// Sound
+byte               playerData[] = {0, 0, 0};
+GattCharacteristic playerChar(0xff1a, (uint8_t*)playerData, sizeof(playerData), sizeof(playerData), GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE_WITHOUT_RESPONSE);
+GattCharacteristic *playerChars[] = {&playerChar };
+GattService        playerService(0xff10, playerChars, sizeof(playerChars) / sizeof(GattCharacteristic *));
+
 // Storage
 bool               storageAvailable = false;
 FS_SECTION_VARS_ADD(fs_config_t storageConfig) = { .cb = &storageCallback, .num_pages = 1, .page_order = 1 };
+
+// Dancer
+Ticker             danceTask;
+int8_t             dancePosition = 0;
+int8_t             danceDirection = 1;
 
 void updateServos() {
   if (servoValues[0] == 0 && servoValues[1] == 0 && servoValues[2] == 0 && servoValues[3] == 0) {
@@ -106,6 +121,26 @@ void saveServoOffsets() {
   fs_erase(&storageConfig, storageConfig.p_start_addr, FS_PAGE_SIZE_WORDS);
 }
 
+void playerCommand(byte cmd, byte arg1, byte arg2) {
+  byte data[10] = {0x7e, 0xff, 0x6, cmd, 0, arg1, arg2, 0, 0, 0xef};
+  int16_t checksum = 0 - data[1] - data[2] - data[3] - data[4] - data[5] - data[6];
+  data[7] = (checksum >> 8) & 0xff;
+  data[8] = checksum & 0xff;
+  Serial.write(data, sizeof(data));
+}
+
+void playerCommand(byte cmd, uint16_t arg) {
+  playerCommand(cmd, arg >> 8, arg & 0xff);
+}
+
+void playSound(uint16_t fileNum, byte volume) {
+  if (volume > 0) {
+    playerCommand(0x6, 0, volume);
+    delay(10);
+  }
+  playerCommand(0x3, fileNum);
+}
+
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
   ble.startAdvertising();
   Serial.println("Disconnected :-(");
@@ -119,6 +154,11 @@ void gattServerWriteCallBack(const GattWriteCallbackParams *params) {
   if (params->handle == servoOffsetsChar.getValueAttribute().getHandle()) {
     memcpy(servoOffsets, params->data, params->len);
     saveServoOffsets();
+  }
+  if ((params->handle == playerChar.getValueAttribute().getHandle()) && (params->len >= 2)) {
+    uint16_t fileId = *(uint16_t*)params->data;
+    uint8_t volume = params->len == 3 ? params->data[2] : 0;
+    playSound(fileId, volume);
   }
 }
 
@@ -151,6 +191,63 @@ void sensorsCallback() {
       }
       ble.updateCharacteristicValue(imuChar.getValueAttribute().getHandle(), (uint8_t*)imuData, sizeof(imuData));
     }
+  }
+}
+
+char *getDeviceName(const uint8_t *data, byte dlen) {
+  static char result[16];
+  byte index = 0;
+
+  while (index + 1 < dlen) {
+    byte field_len = data[index];
+    byte field_type = data[index + 1];
+    const void *field_data = &data[index + 2];
+    index += field_len + 1;
+
+    if (field_type == BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME) {
+      field_len--;
+      if (field_len > 15) {
+        field_len = 15;
+      }
+      memcpy(result, field_data, field_len);
+      result[field_len] = 0;
+      return result;
+    }
+  }
+
+  return NULL;
+}
+
+unsigned long beaconLastSeen = millis();
+void danceCallback() {
+  if (millis() - 2000 > beaconLastSeen) {
+    beaconLastSeen = 0;
+    dancePosition = 0;
+    danceTask.detach();
+  }
+
+  servoValues[0] = 90 + dancePosition;
+  servoValues[1] = 90 + dancePosition;
+  servoValues[2] = 90 + dancePosition;
+  servoValues[3] = 90 + dancePosition;
+  updateServos();
+
+  dancePosition += danceDirection * 2;
+  if (dancePosition > 20 || dancePosition < -20) {
+    danceDirection = -danceDirection;
+  }
+}
+
+void scanningCallback(const Gap::AdvertisementCallbackParams_t* params) {
+  char *deviceName = getDeviceName((const uint8_t *)params->advertisingData, params->advertisingDataLen);
+  if ((params->rssi > RSSI_THRESHOLD) && !strcmp(deviceName, TARGET_DEVICE_NAME)) {
+    Serial.print("Found beacon, RSSI=");
+    Serial.println(params->rssi, DEC);
+
+    if (!beaconLastSeen) {
+      danceTask.attach(danceCallback, 0.02);
+    }
+    beaconLastSeen = millis();
   }
 }
 
@@ -201,19 +298,22 @@ void setup() {
   ble.addService(servosService);
   ble.addService(batteryService);
   ble.addService(imuService);
+  ble.addService(playerService);
   ble.setDeviceName((const uint8_t *)DEVICE_NAME);
   ble.setTxPower(4);
   ble.setAdvertisingInterval(160); // (100 ms = 160 * 0.625ms.)
   ble.setAdvertisingTimeout(0);
   ble.startAdvertising();
 
+  // scanning for ng-beacons
+  ble.setScanParams(200, 100, 0, true);
+  ble.startScan(scanningCallback);
+
   // Battery level task
   batteryTask.attach(sensorsCallback, 0.1);
 
   // Override the system event handler - this is required for fstorage
   softdevice_sys_evt_handler_set(sysEventHandler);
-
-  Serial.println("Ready :-)");
 }
 
 void loop() {
