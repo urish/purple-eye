@@ -7,11 +7,12 @@ purple-eye
 
 ## Prerequisites
 
-The Web Interface uses [Web Bluetooth](https://medium.com/@urish/start-building-with-web-bluetooth-and-progressive-web-apps-6534835959a6) and is available on Chrome on the following Platform:
+The Web Interface uses [Web Bluetooth](https://medium.com/@urish/start-building-with-web-bluetooth-and-progressive-web-apps-6534835959a6) and is available on Chrome on the following platforms:
 
 * Android 6.0 or newer
 * Mac OS X 10.10 or newer
 * Recent Linux ([see here for details](https://acassis.wordpress.com/2016/06/28/how-to-get-chrome-web-bluetooth-working-on-linux/))
+* Windows 10 (Chrome Canary only)
 * Chrome OS
 
 [Online Web Interface](https://urish.github.io/purple-eye/)
