@@ -39,19 +39,22 @@ function updateBattery() {
     });
 }
 
+function servoAngleToPulse(angle) {
+    return 0.5 + (angle / 180) * 2;
+}
+
 // Servo
 function updateServos() {
     for (const i = 0; i < servoValues.length; i++) {
         if (servoValues[i]) {
-            digitalPulse(SERVOS_PINS[i], HIGH, 1 + servoOffsets[i] + servoValues[i]);
+            digitalPulse(SERVOS_PINS[i], HIGH, servoAngleToPulse(servoOffsets[i] + servoValues[i]));
         }
     }
 }
 
 function setServoValues(values) {
     for (const i = 0; i < values.length; i++) {
-        // normalize values - between 0 and 1
-        servoValues[i] = values[i] / 180;
+        servoValues[i] = values[i];
     }
     if (servoValues.find((v) => v > 0)) {
         startTask('servo', updateServos, 50);
