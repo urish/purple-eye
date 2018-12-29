@@ -68,24 +68,9 @@ function setServoOffsets(values) {
 
 function onInit() {
     const eirEntry = (type, data) => [data.length + 1, type].concat(data);
-    NRF.setAdvertising(
-        [
-            eirEntry(0x9, DEVICE_NAME),
-            // Physical-Web beacon
-            [].concat(eirEntry(0x3, [0xaa, 0xfe]), [
-                ,
-                0xaa,
-                0xfe, // Eddystone Service Id
-                0x10, // Frame type: URL
-                0xf8, // Power
-                0x03, // https://
-                'bit.do/prpl',
-            ]),
-        ],
-        {
-            name: DEVICE_NAME,
-        },
-    );
+    NRF.setAdvertising([
+        eirEntry(0x9, DEVICE_NAME),
+    ], { name: DEVICE_NAME });
     NRF.setServices(
         {
             // Battery Level
