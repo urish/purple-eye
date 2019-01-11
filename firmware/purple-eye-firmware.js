@@ -1,7 +1,8 @@
 const DEVICE_NAME = 'PurpleEye';
 
-const SERVOS_PINS = [D29, D30, D2, D28];
-const BATTERY_PIN = D4;
+const SERVOS_PINS = [D7, D6, D8, D12];
+const SERVO_EN_PIN = D13;
+const BATTERY_PIN = D5;
 let servoValues = [0, 0, 0, 0];
 let servoOffsets = [0, 0, 0, 0];
 
@@ -58,8 +59,10 @@ function setServoValues(values) {
     }
     if (servoValues.find((v) => v > 0)) {
         startTask('servo', updateServos, 50);
+		digitalWrite(SERVO_EN_PIN, LOW);
     } else {
         stopTask('servo');
+		digitalWrite(SERVO_EN_PIN, HIGH);
     }
 }
 
@@ -108,6 +111,9 @@ function onInit() {
             advertise: ['180f', '5100'],
         },
     );
+
+	pinMode(SERVO_EN_PIN, 'output');
+	digitalWrite(SERVO_EN_PIN, HIGH);
 
     NRF.on('connect', () => {
         updateBattery();
